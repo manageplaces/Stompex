@@ -27,6 +27,9 @@ defmodule Stompex.Mixfile do
   #
   # Type "mix help deps" for more examples and options
   defp deps do
-    [{:connection, "~> 1.0"}]
+    [
+      {:connection, "~> 1.0"},
+      {:credo, "~> 0.4", only: [:dev, :test]}
+    ]
   end
 end
