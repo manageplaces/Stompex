@@ -1,13 +1,11 @@
 defmodule Stompex do
-  @moduledoc """
-  """
 
   use Connection
   alias Stompex.FrameBuilder, as: FB
   alias Stompex.FrameHandler, as: FH
 
-  @connection_timeout 10000
-  @default_stomp_port 61613
+  @connection_timeout 10_000
+  @default_stomp_port 61_613
 
   def start_link(host, port, login, passcode, headers, timeout \\ @connection_timeout) do
     Connection.start_link(__MODULE__, { host, port, login, passcode, headers, timeout })
@@ -144,7 +142,7 @@ defmodule Stompex do
 
   """
   def subscribe(conn, destination, headers) do
-    GenServer.call(conn, { :subscribe, destination, headers }, 10000)
+    GenServer.call(conn, { :subscribe, destination, headers }, 10_000)
   end
 
   def unsubscribe(conn, destination) do
@@ -196,7 +194,6 @@ defmodule Stompex do
     case FH.send_frame(sock, FB.build_frame("DISCONNECT", %{})) do
       :ok ->
         # We won't wait for a receipt. We'll do this some other time
-        # TODO: Handle disconnect receipt
         :ok = :gen_tcp.close(sock)
         { :close, from } = info
         Connection.reply(from, :ok)
@@ -363,13 +360,6 @@ defmodule Stompex do
 
 
 
-
-  def handle_call(:inspect_state, _, state) do
-    IO.inspect(state)
-    { :reply, :ok, state }
-  end
-
-
   @doc """
   Handles messages from the underlying TCP connection. These
   will be frames from the STOMP server.
@@ -382,12 +372,14 @@ defmodule Stompex do
 
     case frame do
       %{ cmd: "HEARTBEAT" } ->
+        :inet.setopts(sock, active: :once)
         { :noreply, state }
 
       %{ complete: true } ->
         # Great, all done
         destination = frame.headers["destination"]
-        Dict.get(callbacks, destination, [])
+        callbacks
+        |> Dict.get(destination, [])
         |> Enum.map(fn(func) -> func.(frame) end)
 
         :inet.setopts(sock, active: :once)
