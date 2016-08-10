@@ -8,12 +8,25 @@ defmodule Stompex do
   @default_stomp_port 61_613
 
   def start_link(host, port, login, passcode, headers, timeout \\ @connection_timeout) do
-    Connection.start_link(__MODULE__, { host, port, login, passcode, headers, timeout })
+    Connection.start_link(__MODULE__, { host, port, login, passcode, headers, timeout, self() })
   end
 
-  def init({ host, port, login, passcode, headers, timeout }) do
+  def init({ host, port, login, passcode, headers, timeout, calling_process }) do
     headers = Map.merge(%{ "accept-version" => "1.2", "login" => login, "passcode" => passcode }, headers)
-    state = %{ sock: nil, host: host, port: port, headers: headers, timeout: timeout, callbacks: %{}, subscriptions: %{}, subscription_id: 0, pending_frame: nil }
+    state = %{
+      sock: nil,
+      host: host,
+      port: port,
+      headers: headers,
+      timeout: timeout,
+      callbacks: %{},
+      subscriptions: %{},
+      subscription_id: 0,
+      pending_frame: nil,
+      calling_process: calling_process,
+      send_to_caller: false
+    }
+
     { :connect, :init, state }
   end
 
@@ -161,6 +174,10 @@ defmodule Stompex do
 
   def remove_callback(conn, destination, callback) do
     GenServer.call(conn, { :remove_callback, destination, callback })
+  end
+
+  def send_to_caller(conn, send) do
+    GenServer.cast(conn, { :send_to_caller, send })
   end
 
 
@@ -358,6 +375,10 @@ defmodule Stompex do
     { :noreply, state }
   end
 
+  def handle_cast({ :send_to_caller, send }, state) do
+    { :noreply, %{ state | send_to_caller: send } }
+  end
+
 
 
   @doc """
@@ -367,7 +388,7 @@ defmodule Stompex do
   This function should not be invoked directly, as it will
   automatically be called by the TCP connection.
   """
-  def handle_info({ :tcp, _, data}, %{ sock: sock, callbacks: callbacks, pending_frame: pending_frame } = state) do
+  def handle_info({ :tcp, _, data}, %{ sock: sock, callbacks: callbacks, pending_frame: pending_frame, calling_process: process } = state) do
     frame = FH.parse_frame(data, pending_frame)
 
     case frame do
@@ -378,9 +399,14 @@ defmodule Stompex do
       %{ complete: true } ->
         # Great, all done
         destination = frame.headers["destination"]
-        callbacks
-        |> Dict.get(destination, [])
-        |> Enum.map(fn(func) -> func.(frame) end)
+        case state[:send_to_caller] do
+          true ->
+            send(process, { :stompex, destination, frame })
+          _ ->
+            callbacks
+            |> Dict.get(destination, [])
+            |> Enum.map(fn(func) -> func.(frame) end)
+        end
 
         :inet.setopts(sock, active: :once)
         { :noreply, %{ state | pending_frame: nil } }
