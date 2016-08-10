@@ -399,6 +399,7 @@ defmodule Stompex do
       %{ complete: true } ->
         # Great, all done
         destination = frame.headers["destination"]
+        frame = %{ frame | body: String.replace(frame.body, <<0>>, "") }
         case state[:send_to_caller] do
           true ->
             send(process, { :stompex, destination, frame })
