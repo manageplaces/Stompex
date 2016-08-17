@@ -390,52 +390,18 @@ defmodule Stompex do
   automatically be called by the TCP connection.
   """
   def handle_info({ :tcp, _, data}, %{ sock: sock, callbacks: callbacks, pending_frame: pending_frame, calling_process: process } = state) do
-    IO.inspect data
     frames = FH.parse_frames(data, pending_frame)
 
     :inet.setopts(sock, active: :once)
     { :noreply, process_parsed_frames(frames, state) }
-    # Enum.reduce(frames, state, fn(frame, acc) ->
-    #   case frame do
-    #     %{ cmd: "HEARTBEAT" } ->
-    #       acc
-    #
-    #     %{ complete: true } ->
-    #       # Great, all done
-    #       destination = frame.headers["destination"]
-    #       frame = %{ frame | body: String.replace(frame.body, <<0>>, "") }
-    #       case state[:send_to_caller] do
-    #         true ->
-    #           send(process, { :stompex, destination, frame })
-    #         _ ->
-    #           callbacks
-    #           |> Dict.get(destination, [])
-    #           |> Enum.map(fn(func) -> func.(frame) end)
-    #       end
-    #
-    #
-    #       state = %{ state | pending_frame: nil }
-    #
-    #     %{ complete: false } ->
-    #       IO.inspect frame
-    #       # Incomplete frame. Wait for more
-    #       state = %{ state | pending_frame: frame }
-    #   end
-    # end)
-    #
-    # :inet.setopts(sock, active: :once)
-    # { :noreply, state }
-
   end
 
 
   defp process_parsed_frames([frame | frames], %{ send_to_caller: stc, calling_process: process, callbacks: callbacks,  } = state) do
-    IO.inspect frame
     case frame do
       %{ cmd: "HEARTBEAT"} ->
         process_parsed_frames(frames, state)
       %{ cmd: "ERROR" } ->
-        IO.inspect frame, limit: :infinity
         state
       %{ complete: false } ->
         process_parsed_frames(frames, %{ state | pending_frame: frame })
