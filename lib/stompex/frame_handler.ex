@@ -24,7 +24,7 @@ defmodule Stompex.FrameHandler do
   character. This occurrs in the event of a heartbeat
   being sent by the server.
   """
-  def parse_frames(frame = '\n', existing_frame) do
+  def parse_frames(frame = "\n", existing_frame) do
     [%Frame{
       complete: true,
       cmd: "HEARTBEAT"
