@@ -8,7 +8,7 @@ defmodule Stompex.FrameHandler do
   def receive_frame(sock) do
     case :gen_tcp.recv(sock, 0) do
       { :ok, response } ->
-        parse_frame(response, nil)
+        parse_frames(response, nil) |> List.first
       { :error, _ } = error ->
         { :error, error }
     end
@@ -24,11 +24,11 @@ defmodule Stompex.FrameHandler do
   character. This occurrs in the event of a heartbeat
   being sent by the server.
   """
-  def parse_frame(frame = '\n', existing_frame) do
-    %Frame{
+  def parse_frames(frame = '\n', existing_frame) do
+    [%Frame{
       complete: true,
       cmd: "HEARTBEAT"
-    }
+    }]
   end
 
   @doc """
@@ -39,7 +39,7 @@ defmodule Stompex.FrameHandler do
   frame left off. This can be repeated until a full
   frame is received.
   """
-  def parse_frame(frame, existing_frame) do
+  def parse_frames(frame, existing_frame) do
     parser_state = nil
 
     # If the existing frame already has a body,
@@ -57,42 +57,78 @@ defmodule Stompex.FrameHandler do
     |> to_string
     |> String.split("\n")
     |> gather_line_types(parser_state, [])
-    |> build_frame(existing_frame)
+    |> build_frames(existing_frame, [])
     |> mark_completion()
   end
 
-  defp mark_completion(frame) do
-    expected_length = frame.headers["content-length"]
-    case expected_length do
+  defp mark_completion(frames) do
+    completion_frames = Enum.map(frames, fn(frame) ->
+      expected_length = frame.headers["content-length"]
+      case expected_length do
+        nil ->
+          %{ frame | complete: String.trim_trailing(frame.body) |> String.ends_with?(<<0>>) }
+        _ ->
+          %{ frame | complete: byte_size(frame.body) == expected_length }
+      end
+    end)
+
+    completion_frames
+  end
+
+
+  defp build_frames([[type: :body, value: value] | lines], frame, frames) when is_nil(frame) do
+    build_frames(lines, frame, frames)
+  end
+
+  defp build_frames(lines, frame, frames) when is_nil(frame) and lines != [] do
+    build_frames(lines, %Frame{}, [])
+  end
+
+  defp build_frames([[type: :command, cmd: cmd] = command | lines ], frame, frames) do
+    case frame.cmd do
       nil ->
-        %{ frame | complete: String.contains?((frame.body || ""), <<0>>) }
+        build_frames(lines, %{ frame | cmd: cmd }, frames)
       _ ->
-        %{ frame | complete: String.length(frame.body) == expected_length }
+        build_frames(lines, %{ frame | body: (frame.body || "") <> cmd }, frames)
     end
   end
 
-
-  defp build_frame(lines, frame) when is_nil(frame), do: build_frame(lines, %Frame{})
-
-  defp build_frame([[type: :command, cmd: cmd] = command | lines ], frame) do
-    build_frame(lines, %{ frame | cmd: cmd })
+  defp build_frames([[type: :header, key: key, value: value] | lines], frame, frames) do
+    build_frames(lines, %{ frame | headers: Map.merge(frame.headers, %{ key => value }) }, frames)
   end
 
-  defp build_frame([[type: :header, key: key, value: value] | lines], frame) do
-    build_frame(lines, %{ frame | headers: Map.merge(frame.headers, %{ key => value }) })
+  defp build_frames([[type: :body, value: <<0>>] | lines], %Frame{ headers: %{ "content-length" => content_length }} = frame, frames) do
+    # Got a null character, and we have content length set so this may be part of the body.
+    # Check the content length compared with the frame, and if we've got it all then move
+    # on.
+    case byte_size(frame.body) do
+      content_length ->
+        # This frame is finished, but there may be others so keep going
+        build_frames(lines, nil, frames ++ [frame])
+      _ ->
+        # Not finished, just keep moving, it's just a null character
+        build_frames(lines, %{ frame | body: (frame.body || "") <> <<0>> }, frames)
+    end
   end
 
-  defp build_frame([[type: :body, value: value] | lines], frame) do
-    build_frame(lines, %{ frame | body: (frame.body || "") <> value })
+  defp build_frames([[type: :body, value: <<0>>] | lines], frame, frames) do
+    # Got a null character, but no content length so this MUST be the end of a message
+    build_frames(lines, nil, (frames ++ [%{ frame | body: (frame.body || "") <> <<0>> }]))
   end
 
-  defp build_frame([[type: :blankline] | lines], frame = %Frame{ headers: headers, cmd: cmd, body: body }) when headers != nil and cmd != nil and body != nil do
-    build_frame(lines, %{ frame | body: body <> "\n" })
+  defp build_frames([[type: :body, value: value] | lines], %Frame{ headers: headers } = frame, frames) do
+    build_frames(lines, %{ frame | body: (frame.body || "") <> value }, frames)
   end
 
-  defp build_frame([[type: :blankline] | lines], frame), do: build_frame(lines, frame)
+  defp build_frames([[type: :blankline] | lines], frame = %Frame{ headers: headers, cmd: cmd, body: body }, frames) when headers != nil and cmd != nil and body != nil do
+    build_frames(lines, %{ frame | body: body <> "\n" }, frames)
+  end
 
-  defp build_frame(lines = [], frame), do: frame
+  defp build_frames([[type: :blankline] | lines], frame, frames), do: build_frames(lines, frame, frames)
+
+  defp build_frames(lines = [], frame, frames) when is_nil(frame), do: frames
+  defp build_frames(lines = [], frame, frames), do: frames ++ [frame]
+
 
   defp gather_line_types([line | lines], state, types) do
     line_type =
@@ -108,7 +144,10 @@ defmodule Stompex.FrameHandler do
               [ type: :blankline ]
           end
         :body ->
-          [ type: :body, value: line ]
+          case String.match?(line, @server_command_regex) do
+            true -> [ type: :command, cmd: line ]
+            false -> [ type: :body, value: line ]
+          end
       end
 
     gather_line_types(lines, next_parser_state(state, line_type), types ++ [line_type])
