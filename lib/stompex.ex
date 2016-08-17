@@ -191,7 +191,7 @@ defmodule Stompex do
   @doc """
   """
   def connect(info, %{ sock: nil, host: host, port: port, headers: headers, timeout: timeout } = state) do
-    case :gen_tcp.connect(to_char_list(host), port, [active: false], timeout) do
+    case :gen_tcp.connect(to_char_list(host), port, [:binary, active: false], timeout) do
       { :ok, sock } ->
         case info do
           { :reconnect, from } ->
