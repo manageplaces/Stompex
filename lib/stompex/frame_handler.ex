@@ -45,7 +45,7 @@ defmodule Stompex.FrameHandler do
     # If the existing frame already has a body,
     # then we'll continue parsing form the body
     cond do
-      existing_frame && (existing_frame.body || "") != "" ->
+      existing_frame && ((existing_frame.body || "") != "" || Enum.count(existing_frame.headers) > 0) ->
         parser_state = :body
       existing_frame && (Enum.count(existing_frame.headers) != 0) ->
         parser_state = :header
