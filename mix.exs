@@ -29,7 +29,8 @@ defmodule Stompex.Mixfile do
   defp deps do
     [
       {:connection, "~> 1.0"},
-      {:credo, "~> 0.4", only: [:dev, :test]}
+      {:credo, "~> 0.4", only: [:dev, :test]},
+      {:poison, "~> 2.0", only: [:dev, :test]}
     ]
   end
 end
