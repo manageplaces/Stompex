@@ -118,8 +118,9 @@ defmodule StompexTest do
 
   end
 
-  test "can process a simple message with a null" do
+  test "can process two simple message terminated with null" do
     result = FrameHandler.parse_frames(simple_null_line_data, nil)
+
     first_frame = Enum.at(result, 0)
     assert first_frame == %Frame{
       cmd: "MESSAGE",
@@ -226,6 +227,115 @@ defmodule StompexTest do
 
       { :error, detail } ->
         IO.inspect first_frame.body
+        IO.inspect detail
+    end
+
+    second_frame = Enum.at(result, 1)
+    assert second_frame == %Frame{
+      cmd: "MESSAGE",
+      headers: %{
+        "destination" => "/topic/TRAIN_MVT_ALL_TOC",
+        "expires" => "1476385896127",
+        "message-id" => "ID\\cec2netrailwmq1-44888-1476172009944-1\\c1\\c2\\c22\\c20885",
+        "persistent" => "true",
+        "priority" => "4",
+        "subscription" => "0",
+        "timestamp" => "1476385596127",
+        "transformation" => "jms-xml"
+      },
+      content_type: nil,
+      body: "[{\"header\":{\"msg_type\":\"0003\",\"source_dev_id\":\"\",\"user_id\":\"\",\"original_data_source\":\"SMART\",\"msg_queue_timestamp\":\"1476385592000\",\"source_system_id\":\"TRUST\"},\"body\":{\"event_type\":\"ARRIVAL\",\"gbtt_timestamp\":\"1476389220000\",\"original_loc_stanox\":\"\",\"planned_timestamp\":\"1476389220000\",\"timetable_variation\":\"0\",\"original_loc_timestamp\":\"\",\"current_train_id\":\"\",\"delay_monitoring_point\":\"true\",\"next_report_run_time\":\"1\",\"reporting_stanox\":\"78400\",\"actual_timestamp\":\"1476389220000\",\"correction_ind\":\"false\",\"event_source\":\"AUTOMATIC\",\"train_file_address\":null,\"platform\":\" 1\",\"division_code\":\"71\",\"train_terminated\":\"false\",\"train_id\":\"782P94MY13\",\"offroute_ind\":\"false\",\"variation_status\":\"ON TIME\",\"train_service_code\":\"25441000\",\"toc_id\":\"71\",\"loc_stanox\":\"78400\",\"auto_expected\":\"true\",\"direction_ind\":\"DOWN\",\"route\":\"0\",\"planned_event_type\":\"ARRIVAL\",\"next_report_stanox\":\"78410\",\"line_ind\":\"\"}},{\"header\":{\"msg_type\":\"0003\",\"source_dev_id\":\"\",\"user_id\":\"\",\"original_data_source\":\"SMART\",\"msg_queue_timestamp\":\"1476385593000\",\"source_system_id\":\"TRUST\"},\"body\":{\"event_type\":\"ARRIVAL\",\"gbtt_timestamp\":\"\",\"original_loc_stanox\":\"\",\"planned_timestamp\":\"1476388830000\",\"timetable_variation\":\"7\",\"original_loc_timestamp\":\"\",\"current_train_id\":\"\",\"delay_monitoring_point\":\"true\",\"next_report_run_time\":\"1\",\"reporting_stanox\":\"83038\",\"actual_timestamp\":\"1476389220000\",\"correction_ind\":\"false\",\"event_source\":\"AUTOMATIC\",\"train_file_address\":null,\"platform\":\"\",\"division_code\":\"25\",\"train_terminated\":\"false\",\"train_id\":\"731C92MW13\",\"offroute_ind\":\"false\",\"variation_status\":\"LATE\",\"train_service_code\":\"25397003\",\"toc_id\":\"25\",\"loc_stanox\":\"83038\",\"auto_expected\":\"true\",\"direction_ind\":\"\",\"route\":\"0\",\"planned_event_type\":\"ARRIVAL\",\"next_report_stanox\":\"83109\",\"line_ind\":\"\"}}]" <> <<0>>,
+      complete: true
+    }
+
+    case Poison.decode(String.replace(second_frame.body, <<0>>, "")) do
+      { :ok, decoded_json } ->
+        assert decoded_json == [
+          %{
+            "body" => %{
+              "actual_timestamp" => "1476389220000",
+              "auto_expected" => "true",
+              "correction_ind" => "false",
+              "current_train_id" => "",
+              "delay_monitoring_point" => "true",
+              "direction_ind" => "DOWN",
+              "division_code" => "71",
+              "event_source" => "AUTOMATIC",
+              "event_type" => "ARRIVAL",
+              "gbtt_timestamp" => "1476389220000",
+              "line_ind" => "",
+              "loc_stanox" => "78400",
+              "next_report_run_time" => "1",
+              "next_report_stanox" => "78410",
+              "offroute_ind" => "false",
+              "original_loc_stanox" => "",
+              "original_loc_timestamp" => "",
+              "planned_event_type" => "ARRIVAL",
+              "planned_timestamp" => "1476389220000",
+              "platform" => " 1",
+              "reporting_stanox" => "78400",
+              "route" => "0",
+              "timetable_variation" => "0",
+              "toc_id" => "71",
+              "train_file_address" => nil,
+              "train_id" => "782P94MY13",
+              "train_service_code" => "25441000",
+              "train_terminated" => "false",
+              "variation_status" => "ON TIME"
+            },
+          "header" => %{
+            "msg_queue_timestamp" => "1476385592000",
+            "msg_type" => "0003",
+            "original_data_source" => "SMART",
+            "source_dev_id" => "",
+            "source_system_id" => "TRUST",
+            "user_id" => ""
+          }
+        },
+        %{
+          "body" => %{
+            "actual_timestamp" => "1476389220000",
+            "auto_expected" => "true",
+            "correction_ind" => "false",
+            "current_train_id" => "",
+            "delay_monitoring_point" => "true",
+            "direction_ind" => "",
+            "division_code" => "25",
+            "event_source" => "AUTOMATIC",
+            "event_type" => "ARRIVAL",
+            "gbtt_timestamp" => "", "line_ind" => "",
+            "loc_stanox" => "83038",
+            "next_report_run_time" => "1",
+            "next_report_stanox" => "83109",
+            "offroute_ind" => "false",
+            "original_loc_stanox" => "",
+            "original_loc_timestamp" => "",
+            "planned_event_type" => "ARRIVAL",
+            "planned_timestamp" => "1476388830000",
+            "platform" => "",
+            "reporting_stanox" => "83038",
+            "route" => "0",
+            "timetable_variation" => "7",
+            "toc_id" => "25",
+            "train_file_address" => nil,
+            "train_id" => "731C92MW13",
+            "train_service_code" => "25397003",
+            "train_terminated" => "false",
+            "variation_status" => "LATE"
+          },
+          "header" => %{
+            "msg_queue_timestamp" => "1476385593000",
+            "msg_type" => "0003",
+            "original_data_source" => "SMART",
+            "source_dev_id" => "",
+            "source_system_id" => "TRUST",
+            "user_id" => ""
+          }
+        }
+      ]
+
+      { :error, detail } ->
+        IO.inspect second_frame.body
         IO.inspect detail
     end
 
