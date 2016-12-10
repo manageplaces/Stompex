@@ -42,16 +42,21 @@ defmodule Stompex.FrameHandler do
   def parse_frames(frame, existing_frame) do
     parser_state = nil
 
+    # IO.inspect "PARSING = #{String.replace(frame, <<0>>, "<NULL>")}"
+    # IO.inspect "EXISTING = #{existing_frame}", limit: :infinity
+    # IO.puts "\n\n\n\n\n\n\n\n"
+
     # If the existing frame already has a body,
     # then we'll continue parsing form the body
-    cond do
-      existing_frame && ((existing_frame.body || "") != "" || Enum.count(existing_frame.headers) > 0) ->
-        parser_state = :body
-      existing_frame && (Enum.count(existing_frame.headers) != 0) ->
-        parser_state = :header
-      true ->
-        parser_state = :command
-    end
+    parser_state =
+      cond do
+        existing_frame && ((existing_frame.body || "") != "" || Enum.count(existing_frame.headers) > 0) ->
+          :body
+        existing_frame && (Enum.count(existing_frame.headers) != 0) ->
+          :header
+        true ->
+          :command
+      end
 
     frame
     |> to_string
@@ -78,6 +83,10 @@ defmodule Stompex.FrameHandler do
 
   defp build_frames([[type: :body, value: value] | lines], frame, frames) when is_nil(frame) do
     build_frames(lines, frame, frames)
+  end
+
+  defp build_frames([[type: :command, cmd: cmd] = command | lines ], frame, frames) when is_nil(frame) do
+    build_frames([ command | lines ], %Frame{}, frames)
   end
 
   defp build_frames(lines, frame, frames) when is_nil(frame) and lines != [] do
@@ -117,7 +126,14 @@ defmodule Stompex.FrameHandler do
   end
 
   defp build_frames([[type: :body, value: value] | lines], %Frame{ headers: headers } = frame, frames) do
-    build_frames(lines, %{ frame | body: (frame.body || "") <> value }, frames)
+    cond do
+      String.ends_with?(value, <<0>>) ->
+        # Actually a null terminated line. We'll split into two lines and let other things take over
+        new_value = String.replace_suffix(value, <<0>>, "")
+        build_frames([[ type: :body, value: new_value], [ type: :body, value: <<0>> ] | lines ], frame, frames)
+      true ->
+        build_frames(lines, %{ frame | body: (frame.body || "") <> value }, frames)
+    end
   end
 
   defp build_frames([[type: :blankline] | lines], frame = %Frame{ headers: headers, cmd: cmd, body: body }, frames) when headers != nil and cmd != nil and body != nil do
@@ -130,7 +146,7 @@ defmodule Stompex.FrameHandler do
   defp build_frames(lines = [], frame, frames), do: frames ++ [frame]
 
 
-  defp gather_line_types([line | lines], state, types) do
+  def gather_line_types([line | lines], state, types) do
     line_type =
       case state do
         :command ->
@@ -152,9 +168,9 @@ defmodule Stompex.FrameHandler do
 
     gather_line_types(lines, next_parser_state(state, line_type), types ++ [line_type])
   end
-  defp gather_line_types(lines = [], state, types), do: types
+  def gather_line_types(lines = [], state, types), do: types
 
-  defp next_parser_state(state, line_type) do
+  def next_parser_state(state, line_type) do
     case line_type do
       [ type: :command, cmd: cmd ] ->
         :header
