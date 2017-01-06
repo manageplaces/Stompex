@@ -152,7 +152,7 @@ defmodule Stompex.FrameHandler do
         :command ->
           [ type: :command, cmd: line ]
         :header ->
-          match = Regex.run(~r/^([a-zA-Z0-1\-]*):(.*)$/, line)
+          match = Regex.run(~r/^([a-zA-Z0-9\-]*):(.*)$/, line)
           case match do
             [_, key, value] ->
               [ type: :header, key: key, value: value ]
