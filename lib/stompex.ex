@@ -146,7 +146,6 @@ defmodule Stompex do
   When set to `auto`, you are not required to send an acknowledgement
   back to the server.
   When set to `client` or `client-individual`, you MUST send an acknowledgement back.
-  Stompex however will handle this for you.
 
   ## Examples
 
