@@ -27,6 +27,7 @@ defmodule Stompex.FrameHandler do
   def parse_frames(frame = "\n", existing_frame) do
     [%Frame{
       complete: true,
+      headers_complete: true,
       cmd: "HEARTBEAT"
     }]
   end
@@ -42,15 +43,11 @@ defmodule Stompex.FrameHandler do
   def parse_frames(frame, existing_frame) do
     parser_state = nil
 
-    # IO.inspect "PARSING = #{String.replace(frame, <<0>>, "<NULL>")}"
-    # IO.inspect "EXISTING = #{existing_frame}", limit: :infinity
-    # IO.puts "\n\n\n\n\n\n\n\n"
-
     # If the existing frame already has a body,
     # then we'll continue parsing form the body
     parser_state =
       cond do
-        existing_frame && ((existing_frame.body || "") != "" || Enum.count(existing_frame.headers) > 0) ->
+        existing_frame && ((existing_frame.body || "") != "" || (Enum.count(existing_frame.headers) > 0 && existing_frame.headers_complete)) ->
           :body
         existing_frame && (Enum.count(existing_frame.headers) != 0) ->
           :header
@@ -64,20 +61,32 @@ defmodule Stompex.FrameHandler do
     |> gather_line_types(parser_state, [])
     |> build_frames(existing_frame, [])
     |> mark_completion()
+    |> remove_trailing_chars()
   end
 
   defp mark_completion(frames) do
     completion_frames = Enum.map(frames, fn(frame) ->
       expected_length = frame.headers["content-length"]
-      case expected_length do
-        nil ->
-          %{ frame | complete: String.trim_trailing(frame.body) |> String.ends_with?(<<0>>) }
-        _ ->
-          %{ frame | complete: byte_size(frame.body) == expected_length }
+      cond do
+        is_nil(frame.body) -> frame
+        is_nil(expected_length) -> %{ frame | complete: String.trim_trailing(frame.body) |> String.ends_with?(<<0>>) }
+        true -> %{ frame | complete: byte_size(frame.body) >= String.to_integer(expected_length) }
       end
     end)
 
     completion_frames
+  end
+
+  defp remove_trailing_chars(frames) do
+    cleaned_frames = Enum.map(frames, fn(frame) ->
+      cond do
+        is_nil(frame.body) -> frame
+        frame.complete -> %{ frame | body: (String.replace_trailing(frame.body, "\n", "") |> String.replace_trailing(<<0>>, "")) }
+        true -> %{ frame | body: String.replace_suffix(frame.body, "\n", "") }
+      end
+    end)
+
+    cleaned_frames
   end
 
 
@@ -106,17 +115,23 @@ defmodule Stompex.FrameHandler do
     build_frames(lines, %{ frame | headers: Map.merge(frame.headers, %{ key => value }) }, frames)
   end
 
+  # We've got a body line, but the headers are not yet complete, so
+  # we mark the headers as complete, and continue.
+  defp build_frames([[type: :body, value: value] = line | lines], %Frame{ headers: headers, headers_complete: headers_complete } = frame, frames) when headers_complete == false do
+    build_frames([ line | lines ], %{ frame | headers_complete: true }, frames)
+  end
+
   defp build_frames([[type: :body, value: <<0>>] | lines], %Frame{ headers: %{ "content-length" => content_length }} = frame, frames) do
     # Got a null character, and we have content length set so this may be part of the body.
     # Check the content length compared with the frame, and if we've got it all then move
     # on.
-    case byte_size(frame.body) do
-      content_length ->
+    cond do
+      byte_size(frame.body) == String.to_integer(content_length) ->
         # This frame is finished, but there may be others so keep going
         build_frames(lines, nil, frames ++ [frame])
-      _ ->
+      true ->
         # Not finished, just keep moving, it's just a null character
-        build_frames(lines, %{ frame | body: (frame.body || "") <> <<0>> }, frames)
+        build_frames(lines, %{ frame | body: (frame.body || "") <> <<0>> <> "\n" }, frames)
     end
   end
 
@@ -132,7 +147,7 @@ defmodule Stompex.FrameHandler do
         new_value = String.replace_suffix(value, <<0>>, "")
         build_frames([[ type: :body, value: new_value], [ type: :body, value: <<0>> ] | lines ], frame, frames)
       true ->
-        build_frames(lines, %{ frame | body: (frame.body || "") <> value }, frames)
+        build_frames(lines, %{ frame | body: (frame.body || "") <> value <> "\n" }, frames)
     end
   end
 
