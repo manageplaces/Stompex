@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/manageplaces/Stompex.svg?branch=master)](https://travis-ci.org/manageplaces/Stompex)
+
 # Stompex
 
 Stompex is a library to allow you to connect to STOMP based servers. It is a work
