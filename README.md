@@ -24,7 +24,6 @@ def deps do
 end
 ```
 
-
 Once you've run `mix deps.get`, ensure that `Stompex` is added to your applications list
 
 ```elixir
@@ -33,7 +32,6 @@ def application do
 end
 ```
 
-
 ## Getting started
 
 Stompex requires 3 simple steps to get going:
@@ -41,7 +39,6 @@ Stompex requires 3 simple steps to get going:
 - Connect
 - Register a callback for messages
 - Subscribe to a topic
-
 
 For this, there are 3 functions:
 
@@ -65,7 +62,6 @@ Stompex.register_callback conn, "/queue/or/topic/here", callback
 Stompex.subscribe conn, "/queue/or/topic/here"
 ```
 
-
 And that's it, you should now start seeing messages displayed. Obviously you're
 more than likely going to want to do something else with the message, such as
 parse JSON, or XML or whatever it is you might be receiving, but you get the idea.
@@ -83,7 +79,6 @@ Nice and easy.
 Moving on, you may want to do things differently. As mentioned previously, there
 are other variations on the functions listed. Lets take a look at some of the
 other options you have to interact with Stompex.
-
 
 ### connect
 
@@ -109,7 +104,6 @@ Of these options, only the host is required. If this is all you supply, then the
 login and passcode values will be empty strings, and the port will default to
 `61613`.
 
-
 #### `connect/4`
 --
 
@@ -124,8 +118,6 @@ may not be required by your server, but anything that your server requires can b
 supplied here. Note that anything you add here, will ONLY be used for the connection,
 and nothing else. If you need headers for other things, then they should be supplied
 later.
-
-
 
 ### subscribe
 
@@ -161,8 +153,6 @@ We saw earlier how we can add a calback, however stompex also allows us to remov
 Stompex.remove_callback(conn, "/queue/name", callback)
 ```
 
-
-
 ### Acking
 
 Some servers may require that you acknowledge messages that you have received, or you may simply wish to do this yourself. Either way, Stompex makes this very simple. The first thing you should do, is let the server know that you will be acknowledging the messages, but supplying a header when you subscribe to a queue or topic
@@ -179,7 +169,6 @@ callback = fn(msg) ->
   ...
 end
 ```
-    
 **Please note:** It is possible for multiple callbacks to be registered for a single queue or topic, but only one of these should acknowledge the message.
 
 
@@ -194,7 +183,7 @@ defmodule StompexTest do
   def start_link() do
     { :ok, pid } = GenServer.start_link(__MODULE__, %{})
   end
-  
+
   def init(state) do
     { :ok, conn } = Stompex.connect()
 
@@ -203,11 +192,11 @@ defmodule StompexTest do
 
     { :ok, %{ stompex: conn } }
   end
-    	
+
   def handle_info({ :stompex, "/queue/name", frame }, %{ stompex: conn } = state) do
     { :noreply, state }
   end
-    	
+
 end
  ```
     
