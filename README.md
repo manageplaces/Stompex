@@ -62,7 +62,7 @@ callback = fn (msg) ->
 end
 
 Stompex.register_callback conn, "/queue/or/topic/here", callback
-Stompex.subscribe conn, "/queur/or/topic/here"
+Stompex.subscribe conn, "/queue/or/topic/here"
 ```
 
 
