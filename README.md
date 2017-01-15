@@ -86,7 +86,6 @@ other options you have to interact with Stompex.
 Stompex provides 3 variations of the connect function:
 
 #### `connect/0`
---
 
 This allows you to configure the connection details using mix configurations.
 If you choose to use this option, Stompex will expect the following in your configuration
@@ -106,13 +105,11 @@ login and passcode values will be empty strings, and the port will default to
 `61613`.
 
 #### `connect/4`
---
 
 This is the function used in the first example, so there's not much more to explain.
 The four arguments expected are simply the `host`, `port`, `login`, and `passcode`.
 
 #### `connect/5`
---
 
 Exactly the same as `connect/4` with the addition of a headers hash. This may or
 may not be required by your server, but anything that your server requires can be
@@ -123,7 +120,6 @@ later.
 ### subscribe
 
 #### `subscribe/2`
---
 
 This is the function used in the first example. Here, we simply
 specify the queue or topic that we wish to subscribe to
@@ -133,7 +129,6 @@ Stompex.subscribe(conn, "/queue/name")
 ```
 
 #### `subscribe/3`
---
 
 If the queue/topic you're subscribing to expects headers to be
 supplied, then this function should be used. The third argument allows
