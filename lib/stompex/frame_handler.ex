@@ -69,7 +69,7 @@ defmodule Stompex.FrameHandler do
       expected_length = frame.headers["content-length"]
       cond do
         is_nil(frame.body) -> frame
-        is_nil(expected_length) -> %{ frame | complete: String.trim_trailing(frame.body) |> String.ends_with?(<<0>>) }
+        is_nil(expected_length) || expected_length == "" -> %{ frame | complete: String.trim_trailing(frame.body) |> String.ends_with?(<<0>>) }
         true -> %{ frame | complete: byte_size(frame.body) >= String.to_integer(expected_length) }
       end
     end)
@@ -121,7 +121,7 @@ defmodule Stompex.FrameHandler do
     build_frames([ line | lines ], %{ frame | headers_complete: true }, frames)
   end
 
-  defp build_frames([[type: :body, value: <<0>>] | lines], %Frame{ headers: %{ "content-length" => content_length }} = frame, frames) do
+  defp build_frames([[type: :body, value: <<0>>] | lines], %Frame{ headers: %{ "content-length" => content_length }} = frame, frames) when not is_nil(content_length) and content_length != "" do
     # Got a null character, and we have content length set so this may be part of the body.
     # Check the content length compared with the frame, and if we've got it all then move
     # on.
