@@ -121,32 +121,12 @@ defmodule Stompex.FrameHandler do
     build_frames([ line | lines ], %{ frame | headers_complete: true }, frames)
   end
 
-  defp build_frames([[type: :body, value: <<0>>] | lines], %Frame{ headers: %{ "content-length" => content_length }} = frame, frames) when not is_nil(content_length) and content_length != "" do
-    # Got a null character, and we have content length set so this may be part of the body.
-    # Check the content length compared with the frame, and if we've got it all then move
-    # on.
-    cond do
-      byte_size(frame.body) == String.to_integer(content_length) ->
-        # This frame is finished, but there may be others so keep going
-        build_frames(lines, nil, frames ++ [frame])
-      true ->
-        # Not finished, just keep moving, it's just a null character
-        build_frames(lines, %{ frame | body: (frame.body || "") <> <<0>> <> "\n" }, frames)
-    end
-  end
-
-  defp build_frames([[type: :body, value: <<0>>] | lines], frame, frames) do
-    # Got a null character, but no content length so this MUST be the end of a message
-    build_frames(lines, nil, (frames ++ [%{ frame | body: (frame.body || "") <> <<0>> }]))
-  end
-
   defp build_frames([[type: :body, value: value] | lines], %Frame{ headers: headers } = frame, frames) do
-    cond do
-      String.ends_with?(value, <<0>>) ->
-        # Actually a null terminated line. We'll split into two lines and let other things take over
-        new_value = String.replace_suffix(value, <<0>>, "")
-        build_frames([[ type: :body, value: new_value], [ type: :body, value: <<0>> ] | lines ], frame, frames)
+    case should_end_frame?(frame.body, headers["content-length"], value) do
       true ->
+        build_frames(lines, nil, (frames ++ [%{ frame | body: (frame.body || "") <> value }]))
+
+      false ->
         build_frames(lines, %{ frame | body: (frame.body || "") <> value <> "\n" }, frames)
     end
   end
@@ -159,6 +139,25 @@ defmodule Stompex.FrameHandler do
 
   defp build_frames(lines = [], frame, frames) when is_nil(frame), do: frames
   defp build_frames(lines = [], frame, frames), do: frames ++ [frame]
+
+  # Determine whether or not the next line to
+  # be appended to the frame should be the final
+  # line or not.
+  defp should_end_frame?(body, "", next_line), do: should_end_frame?(body, nil, next_line)
+
+  defp should_end_frame?(_body, nil, next_line) do
+    next_line
+    |> String.trim_trailing
+    |> String.ends_with?(<<0>>)
+  end
+
+  defp should_end_frame?(body, length, next_line) when is_binary(length) do
+    should_end_frame?(body, String.to_integer(length), next_line)
+  end
+
+  defp should_end_frame?(body, length, next_line) do
+    byte_size((body || "") <> next_line) >= length
+  end
 
 
   def gather_line_types([line | lines], state, types) do
