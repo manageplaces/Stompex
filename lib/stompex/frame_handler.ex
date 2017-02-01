@@ -43,6 +43,8 @@ defmodule Stompex.FrameHandler do
   def parse_frames(frame, existing_frame) do
     parser_state = nil
 
+    IO.inspect frame, limit: :infinity
+
     # If the existing frame already has a body,
     # then we'll continue parsing form the body
     parser_state =
