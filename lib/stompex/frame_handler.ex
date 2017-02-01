@@ -81,7 +81,7 @@ defmodule Stompex.FrameHandler do
     cleaned_frames = Enum.map(frames, fn(frame) ->
       cond do
         is_nil(frame.body) -> frame
-        frame.complete -> %{ frame | body: (String.replace_trailing(frame.body, "\n", "") |> String.replace_trailing(<<0>>, "")) }
+        frame.complete -> %{ frame | body: (String.replace_trailing(frame.body, "\n", "") |> String.replace_suffix(<<0>>, "")) }
         true -> %{ frame | body: String.replace_suffix(frame.body, "\n", "") }
       end
     end)
