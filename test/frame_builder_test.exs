@@ -46,8 +46,13 @@ defmodule FrameBuilderTest do
       assert disconnect_frame() == %Frame{ cmd: "DISCONNECT" }
     end
 
-    test "returns a connect frame" do
-      assert connect_frame() == %Frame{ cmd: "CONNECT" }
+    test "returns a connect frame if version 1.0" do
+      assert connect_frame(1.0) == %Frame{ cmd: "CONNECT" }
+    end
+
+    test "returns a stomp frame instead of connect if supported" do
+      assert connect_frame(1.1) == %Frame{ cmd: "STOMP" }
+      assert connect_frame(1.2) == %Frame{ cmd: "STOMP" }
     end
 
     test "returns a stomp frame" do
@@ -71,7 +76,7 @@ defmodule FrameBuilderTest do
         |> set_command("INVALID")
 
       assert frame == %Frame{ cmd: nil }
-      
+
     end
 
     test "adds a new header" do
