@@ -255,6 +255,7 @@ There are a number of things missing from Stompex, so here is a brief
 list of things that still need to be added.
 
 - Send heartbeats. Stompex is able to receive them, but does not currently send them.
+- Support sending frames. Right now, it really only handles the receiving of frames.
 - Fully support all STOMP versions. We've only really tested on 1.1.
 - Test test test. REALLY need to add some more tests.
 - Anything else remaining in the STOMP spec that a decent STOMP
