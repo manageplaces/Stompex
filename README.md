@@ -7,8 +7,9 @@ in progress, so please expect any future changes to be breaking until v1.0 is re
 
 ## Installation
 
-Until a v1.0 release is ready, Stompex will not be published to hex. As such,
-installing it requires you to point your dependency at this repo.
+Until a fully functional version is ready, Stompex will not be published
+to hex. As such, installing it requires you to point your dependency at 
+this repo.
 
 ```elixir
 def deps do
