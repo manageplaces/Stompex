@@ -1,4 +1,1 @@
-%{"bunt": {:hex, :bunt, "0.1.6", "5d95a6882f73f3b9969fdfd1953798046664e6f77ec4e486e6fafc7caad97c6f", [:mix], []},
-  "connection": {:hex, :connection, "1.0.2", "f4a06dd3ecae4141aa66f94ce92ea4c4b8753069472814932f1cadbc3078ab80", [:mix], []},
-  "credo": {:hex, :credo, "0.4.7", "1516ebd3c6099eff74ed0ef50637f0a43113c3f65338a9e1792efc03dff34855", [:mix], [{:bunt, "~> 0.1.6", [hex: :bunt, optional: false]}]},
-  "poison": {:hex, :poison, "2.2.0", "4763b69a8a77bd77d26f477d196428b741261a761257ff1cf92753a0d4d24a63", [:mix], []}}
+%{"connection": {:hex, :connection, "1.0.4", "a1cae72211f0eef17705aaededacac3eb30e6625b04a6117c1b2db6ace7d5976", [:mix], []}}

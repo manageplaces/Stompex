@@ -22,7 +22,8 @@ defmodule StompexTest.Messages do
       content_type: nil,
       body: "body text\n",
       complete: true,
-      headers_complete: true
+      headers_complete: true,
+      last_header: "header-3"
     }
   end
 
@@ -58,7 +59,8 @@ defmodule StompexTest.Messages do
       body text
       """,
       complete: true,
-      headers_complete: true
+      headers_complete: true,
+      last_header: "content-length"
     }
   end
 
@@ -91,7 +93,8 @@ defmodule StompexTest.Messages do
       body text
       """,
       complete: false,
-      headers_complete: true
+      headers_complete: true,
+      last_header: "header-3"
     }
   end
 
@@ -134,7 +137,8 @@ defmodule StompexTest.Messages do
         body text
         """,
         complete: true,
-        headers_complete: true
+        headers_complete: true,
+        last_header: "header-3"
       },
       %Stompex.Frame{
         cmd: "MESSAGE",
@@ -148,7 +152,8 @@ defmodule StompexTest.Messages do
         body text
         """,
         complete: true,
-        headers_complete: true
+        headers_complete: true,
+        last_header: "header-3"
       }
     ]
   end
@@ -185,7 +190,8 @@ defmodule StompexTest.Messages do
         body text
         """,
         complete: true,
-        headers_complete: true
+        headers_complete: true,
+        last_header: "header-3"
       },
       %Stompex.Frame{
         cmd: "MESSAGE",
@@ -193,7 +199,8 @@ defmodule StompexTest.Messages do
         content_type: nil,
         body: nil,
         complete: false,
-        headers_complete: false
+        headers_complete: false,
+        last_header: nil
       }
     ]
   end
@@ -228,7 +235,8 @@ defmodule StompexTest.Messages do
       content_type: nil,
       body: nil,
       complete: false,
-      headers_complete: false
+      headers_complete: false,
+      last_header: "header-2"
     }
   end
 
@@ -245,7 +253,8 @@ defmodule StompexTest.Messages do
       body text
       """,
       complete: true,
-      headers_complete: true
+      headers_complete: true,
+      last_header: "header-3"
     }
   end
 
@@ -258,7 +267,8 @@ defmodule StompexTest.Messages do
       content_type: nil,
       body: nil,
       complete: true,
-      headers_complete: true
+      headers_complete: true,
+      last_header: nil
     }
   end
 end
