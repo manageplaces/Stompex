@@ -33,7 +33,7 @@ defmodule Stompex.Receiver do
     |> read_command(conn)
     |> read_headers(conn)
     |> read_body(conn)
-    |> clean
+    |> clean_frame
   end
 
   defp read_command(frame, conn) do
@@ -95,7 +95,8 @@ defmodule Stompex.Receiver do
     # got it.
     case String.contains?(body, <<0>>) do
       true ->
-        frame |> append_body(body)
+        frame
+        |> append_body(body)
 
       false ->
         frame |> append_body(body) |> read_body(conn)
@@ -104,18 +105,6 @@ defmodule Stompex.Receiver do
 
   defp return_to_caller(frame, %{ caller: caller }) do
     send(caller, { :receiver, frame })
-  end
-
-  #
-  # Cleans up the frame once parsing has finished.
-  # This will remove the final null character that
-  # terminates the frame, as well as remove the
-  # new line character from the command
-  #
-  defp clean(frame) do
-    frame
-    |> set_command(String.replace_suffix(frame.cmd, "\n", ""))
-    |> set_body(String.replace_suffix(frame.body, <<0>>, ""))
   end
 
 end

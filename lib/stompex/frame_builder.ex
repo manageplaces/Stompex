@@ -256,4 +256,28 @@ defmodule Stompex.FrameBuilder do
     |> to_char_list()
   end
 
+
+  @doc """
+  Once a frame has been received, this function should
+  be called to clear out any trailing null characters
+  or new lines from the command and body.
+
+  **Note:** This should not be called multiple times.
+  The receiving process is guaranteed to have trailing
+  characters, so this function is safe to be used once,
+  but any further use may start removing characters
+  that are valid in the frames body.
+  """
+  @spec clean_frame(Stompex.Frame.t) :: Stompex.Frame.t
+  def clean_frame(frame) do
+    cleaned_body =
+      frame.body
+      |> String.trim_trailing()
+      |> String.replace_suffix(<<0>>, "")
+
+    frame
+    |> set_command(String.trim_trailing(frame.cmd))
+    |> set_body(cleaned_body)
+  end
+
 end
