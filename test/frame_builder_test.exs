@@ -129,13 +129,13 @@ defmodule FrameBuilderTest do
       assert frame == %Frame{ body: "testing" }
     end
 
-    test "adds a null character and new line" do
+    test "adds a null character and new line and converts to char list" do
       frame =
         new_frame()
         |> set_body("testing")
         |> finish_frame
 
-      assert frame == %Frame{ body: "testing" <> <<0>> <> "\n" }
+      assert frame == (%Frame{ body: "testing" <> <<0>> <> "\n" } |> to_string() |> to_char_list)
     end
   end
 

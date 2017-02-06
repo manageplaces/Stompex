@@ -155,7 +155,7 @@ defmodule Stompex do
     frame =
       send_frame()
       |> put_header("destination", destination)
-      |> put_header("content-length", byte_size(body))
+      |> put_header("content-length", byte_size(message))
       |> set_body(message)
       |> finish_frame()
 
