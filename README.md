@@ -8,7 +8,7 @@ in progress, so please expect any future changes to be breaking until v1.0 is re
 ## Installation
 
 Until a fully functional version is ready, Stompex will not be published
-to hex. As such, installing it requires you to point your dependency at 
+to hex. As such, installing it requires you to point your dependency at
 this repo.
 
 ```elixir
@@ -131,13 +131,23 @@ Stompex.subscribe(conn, "/queue/name")
 
 #### `subscribe/3`
 
+The same as `subscribe/2`, but options can be supplied. See
+`subscribe/4` for available options
+
+#### `subscribe/4`
+
 If the queue/topic you're subscribing to expects headers to be
 supplied, then this function should be used. The third argument allows
 you to specify a map of headers containing anything you like (that is
 valid within the STOMP specification).
 
-**Note:** that at this point in time, Stompex makes no effort to
-validate that you are supplying specification valid values here.
+The fourth argument allows you to supply options. The options available
+are:
+
+- `:compressed` - Whether or not the body of the frame is gzip compressed.
+If `false` (which is default), Stompex will simply leave the frames body
+as it is, but if set to `true`, it will automatically decompress the body
+before passing the frame on.
 
 ```elixir
 Stompex.subscribe(conn, "/queue/name", %{"header1" => "value 1",
@@ -161,7 +171,7 @@ with the same arguments as `register_callback/3`.
 Stompex.remove_callback(conn, "/queue/name", callback)
 ```
 
-### Acking
+### Acking and Nacking
 
 Some servers may require that you acknowledge messages that you have
 received, or you may simply wish to do this yourself. Either way,
@@ -187,6 +197,25 @@ end
 **Please note:** It is possible for multiple callbacks to be
 registered for a single queue or topic, but only one of these should
 acknowledge the message.
+
+
+It is also possible to `NACK` a message if you're connecting to
+a STOMP server that supports version 1.1 or above of the STOMP
+protocol. This works in exactly the same way as the `ack/2`
+function
+
+```elixir
+callback = fn(msg) ->
+  ...
+  cond do
+    is_processed?(msg) ->
+      Stompex.ack(conn, msg)
+
+    true ->
+      Stompex.nack(conn, msg)
+  end
+end
+```
 
 ### Without registering callbacks
 
@@ -227,6 +256,27 @@ process, which in this example is a GenServer.
 
 All messages here are then handled by the `handle_info/2` function.
 
+### Sending a message
+
+If you're connecting to a server that is used for two way
+communication, Stompex will allow you to easily send frames
+back to the server using the `send/3` function:
+
+```elixir
+...
+msg = """
+Hello world!
+
+I'm a multi line message. I can include
+any character I like, including #{<<0>>} if
+I feel like it!
+"""
+Stompex.send(conn, "/queue/my-queue", msg)
+```
+
+Stompex will automatically set the `content-length` header,
+so you are free to add any characters you like to the message.
+
 ## That's all folks
 
 So that about sums up Stompex. If you run into any problems along the
@@ -256,7 +306,7 @@ There are a number of things missing from Stompex, so here is a brief
 list of things that still need to be added.
 
 - Send heartbeats. Stompex is able to receive them, but does not currently send them.
-- Support sending frames. Right now, it really only handles the receiving of frames.
+- Support transactions.
 - Fully support all STOMP versions. We've only really tested on 1.1.
 - Test test test. REALLY need to add some more tests.
 - Anything else remaining in the STOMP spec that a decent STOMP
