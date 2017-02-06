@@ -158,8 +158,11 @@ defmodule Stompex.Api do
       def subscribe(conn, destination) do
         subscribe(conn, destination, [])
       end
-      def subscribe(conn, destination, opts) do
-        subscribe(conn, destination, %{ "ack" => "auto" }, opts)
+      def subscribe(conn, destination, headers_or_opts) when is_list(headers_or_opts) do
+        subscribe(conn, destination, %{ "ack" => "auto" }, headers_or_opts)
+      end
+      def subscribe(conn, destination, headers_or_opts) when is_map(headers_or_opts) do
+        subscribe(conn, destination, headers_or_opts, [])
       end
       @spec subscribe(pid, String.t, map, keyword) :: term
       def subscribe(conn, destination, headers, opts) do

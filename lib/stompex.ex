@@ -80,7 +80,7 @@ defmodule Stompex do
     error = headers["message"] || "Server rejected connection"
     { :stop, error, error }
   end
-  defp connected_with_frame(frame, _state) do
+  defp connected_with_frame(_frame, _state) do
     error = "Server rejected connection"
     { :stop, error, error }
   end
