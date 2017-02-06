@@ -43,14 +43,11 @@ defmodule Stompex do
 
 
   defp stomp_connect(conn, state) do
-    IO.inspect state.version
     frame =
       connect_frame(state.version)
       |> put_header("host", state[:host])
       |> put_headers(state[:headers])
       |> finish_frame()
-
-    IO.inspect(frame, limit: :infinity)
 
     with :ok <- :gen_tcp.send(conn, frame),
          { :ok, parser } <- Stompex.Parser.start_link(conn),
