@@ -22,8 +22,7 @@ defmodule Stompex do
   def disconnect(info, %{ sock: sock, parser: parser } = state) do
     frame =
       disconnect_frame()
-      |> to_string()
-      |> to_char_list()
+      |> finish_frame()
 
     { :close, from } = info
     Connection.reply(from, :ok)
@@ -44,12 +43,14 @@ defmodule Stompex do
 
 
   defp stomp_connect(conn, state) do
+    IO.inspect state.version
     frame =
-      connect_frame()
+      connect_frame(state.version)
       |> put_header("host", state[:host])
       |> put_headers(state[:headers])
-      |> to_string
-      |> to_char_list
+      |> finish_frame()
+
+    IO.inspect(frame, limit: :infinity)
 
     with :ok <- :gen_tcp.send(conn, frame),
          { :ok, parser } <- Stompex.Parser.start_link(conn),
@@ -64,7 +65,7 @@ defmodule Stompex do
 
   end
 
-  defp connected_with_frame(%{ cmd: "CONNECTED", headers: headers, parser: parser }, state) do
+  defp connected_with_frame(%{ cmd: "CONNECTED", headers: headers }, %{ parser: parser } = state) do
     case headers["version"] do
       nil ->
         # No version returned, so we're running on a version 1.0 server
@@ -82,7 +83,7 @@ defmodule Stompex do
     error = headers["message"] || "Server rejected connection"
     { :stop, error, error }
   end
-  defp connected_with_frame(_frame, _state) do
+  defp connected_with_frame(frame, _state) do
     error = "Server rejected connection"
     { :stop, error, error }
   end
@@ -125,12 +126,12 @@ defmodule Stompex do
   end
 
   @doc false
-  def handle_call({ :subscribe, destination, headers }, _, %{ subscriptions: subscriptions } = state) do
+  def handle_call({ :subscribe, destination, headers, opts }, _, %{ subscriptions: subscriptions } = state) do
     case Dict.has_key?(subscriptions, destination) do
       true ->
         { :reply, { :error, "You have already subscribed to this destination" }, state }
       false ->
-        subscribe_to_destination(destination, headers, state)
+        subscribe_to_destination(destination, headers, opts, state)
     end
   end
 
@@ -144,59 +145,82 @@ defmodule Stompex do
     end
   end
 
+  @doc false
   def handle_call(:close, from, state) do
     { :disconnect, { :close, from }, state }
   end
 
+  @doc false
+  def handle_call({ :send, destination, message }, %{ sock: sock } = state) do
+    frame =
+      send_frame()
+      |> put_header("destination", destination)
+      |> set_body(message)
+      |> finish_frame()
 
+    response = :gen_tcp.send(sock, frame)
+    { :reply, response, state }
+  end
+
+
+
+
+  @doc false
   def handle_cast({ :acknowledge, frame }, %{ sock: sock } = state) do
     frame =
       ack_frame()
       |> put_header("message-id", frame.headers["message-id"])
       |> put_header("subscription", frame.headers["subscription"])
-      |> to_string
-      |> to_char_list
+      |> finish_frame()
 
     :gen_tcp.send(sock, frame)
 
     { :noreply, state }
   end
-
+  @doc false
   def handle_cast({ :nack, _frame }, %{ version: 1.0 } = state ) do
     Logger.warn("'NACK' frame was requested, but is not valid for version 1.0 of the STOMP protocol. Ignoring")
     { :noreply, state }
   end
+  @doc false
   def handle_cast({ :nack, frame }, %{ sock: sock } = state ) do
     frame =
       nack_frame()
       |> put_header("message-id", frame.headers["message-id"])
       |> put_header("subscription", frame.headers["subscription"])
-      |> to_string
-      |> to_char_list
+      |> finish_frame()
 
     :gen_tcp.send(sock, frame)
     { :noreply, state }
   end
 
+  @doc false
   def handle_cast({ :send_to_caller, send }, state) do
     { :noreply, %{ state | send_to_caller: send } }
   end
 
 
+
+
+
+
+
+  @doc false
   def handle_info({ :parser, frame }, %{ send_to_caller: true, calling_process: process, parser: parser } = state) do
     dest = frame.headers["destination"]
+    frame = decompress_frame(frame, dest, state)
+
     send(process, { :stompex, dest, frame })
     Stompex.Parser.next_frame(parser)
 
     { :noreply, state }
   end
 
-  def handle_info({ :parser, _frame }, %{ send_to_caller: false, callbacks: %{} } = state) do
-    Logger.warn("Frame received, but no callbacks registered. Discarding frame")
-    { :noreply, state }
-  end
+  @doc false
   def handle_info({ :parser, frame }, %{ send_to_caller: false, callbacks: callbacks, parser: parser } = state) do
     dest = frame.headers["destination"]
+    frame = decompress_frame(frame, dest, state)
+
     callbacks
     |> Dict.get(dest, [])
     |> Enum.each(fn(func) -> func.(frame) end)
@@ -210,7 +234,7 @@ defmodule Stompex do
 
 
 
-  defp subscribe_to_destination(destination, headers, %{ sock: sock, subscription_id: id, subscriptions: subs } = state) do
+  defp subscribe_to_destination(destination, headers, opts, %{ sock: sock, subscription_id: id, subscriptions: subs } = state) do
     frame =
       subscribe_frame()
       |> put_header("id", headers["id"] || id)
@@ -220,12 +244,13 @@ defmodule Stompex do
 
     state = %{ state | subscription_id: (id + 1) }
 
-    case :gen_tcp.send(sock, to_char_list(to_string(frame))) do
+    case :gen_tcp.send(sock, finish_frame(frame)) do
       :ok ->
         # Great we've subscribed. Now keep track of it
         subscription = %{
           id: frame.headers[:id],
-          ack: frame.headers[:ack]
+          ack: frame.headers[:ack],
+          compressed: Keyword.get(opts, :compressed, false)
         }
 
         Stompex.Parser.next_frame(state[:parser])
@@ -242,8 +267,7 @@ defmodule Stompex do
     frame =
       unsubscribe_frame()
       |> put_header("id", subscription[:id])
-      |> to_string
-      |> to_char_list
+      |> finish_frame()
 
     case :gen_tcp.send(sock, frame) do
       :ok ->
@@ -251,6 +275,19 @@ defmodule Stompex do
 
       { :error, _ } = error ->
         { :noreply, error }
+    end
+  end
+
+
+  defp decompress_frame(frame, dest, %{ subscriptions: subs }) do
+    subscription = subs[dest]
+    case subscription.compressed do
+      true ->
+        frame
+        |> set_body(:zlib.gunzip(frame.body))
+
+      false ->
+        frame
     end
   end
 

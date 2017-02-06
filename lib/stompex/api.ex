@@ -27,7 +27,7 @@ defmodule Stompex.Api do
           calling_process: calling_process,
           send_to_caller: false,
           parser: nil,
-          version: nil
+          version: Stompex.Validator.normalise_version(headers["accept-version"])
         }
 
         { :connect, :init, state }
@@ -121,21 +121,6 @@ defmodule Stompex.Api do
       any messages received from the server will be sent to the
       handlers if configured.
 
-      This function will default the subscription to not require
-      acknowledgements by setting the `ack` header to `auto`. If
-      your server requires acknowledgement of messages, use the
-      `subscribe/3` function instead.
-      """
-      @spec subscribe(pid, String.t) :: term
-      def subscribe(conn, destination) do
-        Stompex.subscribe(conn, destination, %{ "ack" => "auto" })
-      end
-
-      @doc """
-      Subscribes to a specific queue or topic. Once subscribed,
-      any messages received from the server will be sent to the
-      handlers if configured.
-
       This function allows you to specify any headers that are
       required by your server. By default, the `id` header will
       be automatically generated, but you may specify your own
@@ -160,10 +145,25 @@ defmodule Stompex.Api do
           Stompex.subscribe("/topics/main", conn, %{ "id" => "123" })
           Stompex.subscribe("/topics/main", conn, %{ "ack" => "client" })
 
+      When subscribing, it is also possible to supply options. These
+      alter the way in which Stompex will handle incoming frames for
+      this subscription.
+
+      - :compressed - Whether or not the incoming frame contains a body
+      that is gzip compressed. If set to `true` Stompex will decompress
+      the body before passing on the frame. If `false` (default), no
+      decompression will be attempted.
+
       """
-      @spec subscribe(pid, String.t, map) :: term
-      def subscribe(conn, destination, headers) do
-        GenServer.call(conn, { :subscribe, destination, headers }, 10_000)
+      def subscribe(conn, destination) do
+        subscribe(conn, destination, [])
+      end
+      def subscribe(conn, destination, opts) do
+        subscribe(conn, destination, %{ "ack" => "auto" }, opts)
+      end
+      @spec subscribe(pid, String.t, map, keyword) :: term
+      def subscribe(conn, destination, headers, opts) do
+        GenServer.call(conn, { :subscribe, destination, headers, opts }, 10_000)
       end
 
       @doc """
@@ -306,9 +306,31 @@ defmodule Stompex.Api do
         GenServer.cast(conn, { :acknowledge, frame })
       end
 
+      @doc """
+      NACK messages are the opposite of ACK messages, and inform
+      that server that a frame has not been correctly processed.
+      What the server does with this information is specific to
+      that server, but this function will allow you to send this
+      message.
+      """
       @spec nack(pid, Stompex.Frame.t) :: :ok
       def nack(conn, frame) do
         GenServer.cast(conn, { :nack, frame })
+      end
+
+
+      @doc """
+      Send a message to the specified destination. This function
+      will return the raw response of the underlying TCP connection
+      write attempt. If this succeeds, it will simply return `:ok`.
+      Note that even if this function returns `:ok`, the server
+      may still return an error. This will be returned to the
+      registered callback for the given destination, or the calling
+      process depending on configuration
+      """
+      @spec send(pid, String.t, String.t) :: :ok | { :error, :gen_tcp.reason }
+      def send(conn, destination, message) do
+        GenServer.call(conn, { :send, destination, message })
       end
 
     end

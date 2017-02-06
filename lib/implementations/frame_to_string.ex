@@ -7,7 +7,7 @@ defimpl String.Chars, for: Stompex.Frame do
       Enum.join(Enum.map(frame.headers, fn {k, v} -> "#{k}:#{v}" end), "\n"),
       "\n\n",
       frame.body
-    ])  <> <<0>>
+    ])
 
   end
 

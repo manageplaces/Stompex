@@ -236,14 +236,24 @@ defmodule Stompex.FrameBuilder do
 
   @doc """
   Once the headers and body are finished, the frame must
-  be finished before it can be used. This function will
-  simply append a null character to the end of the body,
-  followed by a new line.
+  be finished before it can be used. Because the underlying
+  connection used is an erlang library, the message must
+  be converted to a chart list rather than a binary string.
+  This function will append the terminating character, add
+  a new line character, and then convert the frame into a
+  character list.
+
+  Please note that this function cannot be used to pipe
+  into any of the other frame builder functions, as it
+  does not return a frame.
   """
+  @spec finish_frame(Stompex.Frame.t) :: charlist
   def finish_frame(frame) do
     frame
     |> append_body(<<0>>, new_line: false)
     |> append_body(@eol, new_line: false)
+    |> to_string()
+    |> to_char_list()
   end
 
 end

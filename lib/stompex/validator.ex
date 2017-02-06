@@ -7,6 +7,7 @@ defmodule Stompex.Validator do
   you should not really be building frames up directly
   yourself.
   """
+  use Stompex.Constants
 
   @valid_commands_10 ~W(CONNECTED MESSAGE RECEIPT ERROR CONNECT SEND SUBSCRIBE UNSUBSCRIBE BEGIN COMMIT ABORT ACK DISCONNECT)
   @valid_commands_11 ~W(STOMP NACK)
@@ -42,6 +43,16 @@ defmodule Stompex.Validator do
   end
   def format_header(key, value) do
     %{ key => value }
+  end
+
+
+  def normalise_version([]), do: @default_version
+  def normalise_version(versions) when is_nil(versions) or versions == "", do: @default_version
+  def normalise_version(versions) when is_binary(versions), do: String.to_float(versions)
+  def normalise_version(versions) when is_list(versions) do
+    versions
+    |> Enum.map(fn(v) -> String.to_float(v) end)
+    |> Enum.max
   end
 
 end
