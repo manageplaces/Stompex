@@ -96,10 +96,10 @@ defmodule Stompex.Receiver do
     case String.contains?(body, <<0>>) do
       true ->
         frame
-        |> append_body(body)
+        |> append_body(body, new_line: false)
 
       false ->
-        frame |> append_body(body) |> read_body(conn)
+        frame |> append_body(body, new_line: false) |> read_body(conn)
     end
   end
 
