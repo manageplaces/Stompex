@@ -2,8 +2,8 @@ defmodule Stompex.Connection do
   @moduledoc """
   This module provides a number of helpful functions
   for retrieving data from a TCP socket. Primarily
-  these are meant for use by the parser but can be
-  used elsewhere if needed.
+  these are meant for use by the frame receiver but
+  can be used elsewhere if needed.
   """
 
   @doc """

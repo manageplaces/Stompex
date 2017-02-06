@@ -1,6 +1,6 @@
-defmodule Stompex.Parser do
+defmodule Stompex.Receiver do
   use GenServer
-  use Stompex.Parser.Api
+  use Stompex.Receiver.Api
 
   import Stompex.FrameBuilder
   alias Stompex.Connection, as: Con
@@ -103,7 +103,7 @@ defmodule Stompex.Parser do
   end
 
   defp return_to_caller(frame, %{ caller: caller }) do
-    send(caller, { :parser, frame })
+    send(caller, { :receiver, frame })
   end
 
   #

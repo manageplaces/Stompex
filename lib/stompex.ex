@@ -19,19 +19,19 @@ defmodule Stompex do
   end
 
   @doc false
-  def disconnect(info, %{ sock: sock, parser: parser } = state) do
+  def disconnect(info, %{ sock: sock, receiver: receiver } = state) do
     frame =
       disconnect_frame()
       |> finish_frame()
 
     { :close, from } = info
     Connection.reply(from, :ok)
-    GenServer.stop(parser)
+    GenServer.stop(receiver)
 
     case :gen_tcp.send(sock, frame) do
       :ok ->
         :gen_tcp.close(sock)
-        { :reply, :ok, %{ state | sock: nil, parser: nil } }
+        { :reply, :ok, %{ state | sock: nil, receiver: nil } }
 
       { :error, _ } = error ->
         { :stop, error, error }
@@ -50,10 +50,10 @@ defmodule Stompex do
       |> finish_frame()
 
     with :ok <- :gen_tcp.send(conn, frame),
-         { :ok, parser } <- Stompex.Parser.start_link(conn),
-          { :ok, frame } <- Stompex.Parser.receive_frame(parser)
+         { :ok, receiver } <- Stompex.Receiver.start_link(conn),
+          { :ok, frame } <- Stompex.Receiver.receive_frame(receiver)
     do
-      connected_with_frame(frame, %{ state | sock: conn, parser: parser})
+      connected_with_frame(frame, %{ state | sock: conn, receiver: receiver})
 
     else
       error ->
@@ -62,17 +62,17 @@ defmodule Stompex do
 
   end
 
-  defp connected_with_frame(%{ cmd: "CONNECTED", headers: headers }, %{ parser: parser } = state) do
+  defp connected_with_frame(%{ cmd: "CONNECTED", headers: headers }, %{ receiver: receiver } = state) do
     case headers["version"] do
       nil ->
         # No version returned, so we're running on a version 1.0 server
         Logger.debug("STOMP server supplied no version. Reverting to version 1.0")
-        Stompex.Parser.set_version(parser, 1.0)
+        Stompex.Receiver.set_version(receiver, 1.0)
         { :ok, %{ state | version: 1.0 } }
 
       version ->
         Logger.debug("Stompex using protocol version #{version}")
-        Stompex.Parser.set_version(parser, version)
+        Stompex.Receiver.set_version(receiver, version)
         { :ok, %{ state | version: version } }
     end
   end
@@ -204,18 +204,18 @@ defmodule Stompex do
 
 
   @doc false
-  def handle_info({ :parser, frame }, %{ send_to_caller: true, calling_process: process, parser: parser } = state) do
+  def handle_info({ :receiver, frame }, %{ send_to_caller: true, calling_process: process, receiver: receiver } = state) do
     dest = frame.headers["destination"]
     frame = decompress_frame(frame, dest, state)
 
     send(process, { :stompex, dest, frame })
-    Stompex.Parser.next_frame(parser)
+    Stompex.Receiver.next_frame(receiver)
 
     { :noreply, state }
   end
 
   @doc false
-  def handle_info({ :parser, frame }, %{ send_to_caller: false, callbacks: callbacks, parser: parser } = state) do
+  def handle_info({ :receiver, frame }, %{ send_to_caller: false, callbacks: callbacks, receiver: receiver } = state) do
     dest = frame.headers["destination"]
     frame = decompress_frame(frame, dest, state)
 
@@ -223,7 +223,7 @@ defmodule Stompex do
     |> Dict.get(dest, [])
     |> Enum.each(fn(func) -> func.(frame) end)
 
-    Stompex.Parser.next_frame(parser)
+    Stompex.Receiver.next_frame(receiver)
 
     { :noreply, state }
   end
@@ -251,7 +251,7 @@ defmodule Stompex do
           compressed: Keyword.get(opts, :compressed, false)
         }
 
-        Stompex.Parser.next_frame(state[:parser])
+        Stompex.Receiver.next_frame(state[:receiver])
 
         { :reply, :ok, %{ state | subscriptions: Map.merge(subs, %{ destination => subscription })} }
 

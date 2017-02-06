@@ -26,7 +26,7 @@ defmodule Stompex.Api do
           subscription_id: 0,
           calling_process: calling_process,
           send_to_caller: false,
-          parser: nil,
+          receiver: nil,
           version: Stompex.Validator.normalise_version(headers["accept-version"])
         }
 

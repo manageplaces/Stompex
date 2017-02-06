@@ -1,4 +1,4 @@
-defmodule Stompex.Parser.State do
+defmodule Stompex.Receiver.State do
   use Stompex.Constants
 
   defstruct caller: nil,
