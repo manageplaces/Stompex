@@ -46,6 +46,30 @@ defmodule Stompex.Validator do
   end
 
 
+  @doc """
+  Returns the header key required for ack'ing a
+  received frame. STOMP 1.2 simplified this by
+  changing the `message-id` header to simply `id`.
+  This function, given the current version in use,
+  will return the appropriate header to use.
+
+  Note this also applies for NACK frames.
+  """
+  @spec ack_header(float) :: String.t
+  def ack_header(1.2), do: "id"
+  def ack_header(_version), do: "message-id"
+
+
+  @doc """
+  Converts one or more versions into floats. Frames
+  received from the STOMP server will be in a String
+  format. This function should be used to convert back
+  into something usable.
+  """
+  @spec normalise_version([]) :: float
+  @spec normalise_version(nil) :: float
+  @spec normalise_version(String.t) :: float
+  @spec normalise_version([String.t]) :: [float]
   def normalise_version([]), do: @default_version
   def normalise_version(versions) when is_nil(versions) or versions == "", do: @default_version
   def normalise_version(versions) when is_binary(versions), do: String.to_float(versions)

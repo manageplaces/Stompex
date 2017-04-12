@@ -10,7 +10,7 @@ defmodule Stompex.Receiver do
   @doc false
   def handle_cast(:next_frame, %{ conn: conn } = state) do
     conn
-    |> do_receive
+    |> do_receive()
     |> return_to_caller(state)
 
     { :noreply, state }

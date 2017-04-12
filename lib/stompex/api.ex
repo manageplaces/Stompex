@@ -2,66 +2,65 @@ defmodule Stompex.Api do
   @moduledoc false
 
   defmacro __using__(_opts) do
-    quote do
+    quote location: :keep do
 
       @connection_timeout 10_000
       @default_stomp_port 61618
 
       @doc false
-      def start_link(host, port, login, passcode, headers, timeout \\ @connection_timeout) do
-        Connection.start_link(__MODULE__, { host, port, login, passcode, headers, timeout, self() })
+      def start_link(opts) do
+        Connection.start_link(__MODULE__, Keyword.merge(opts, [caller: self()]))
       end
 
       @doc false
-      def init({ host, port, login, passcode, headers, timeout, calling_process }) do
+      def init(opts) do
+        login = Keyword.get(opts, :login, "")
+        passcode = Keyword.get(opts, :passcode, "")
+        headers = Keyword.get(opts, :headers, %{})
+
         headers = Map.merge(%{ "accept-version" => "1.2", "login" => login, "passcode" => passcode }, headers)
-        state = %{
-          sock: nil,
-          host: host,
-          port: port,
+        state = %Stompex.State{
+          host: Keyword.get(opts, :host),
+          port: Keyword.get(opts, :port, @default_stomp_port),
           headers: headers,
-          timeout: timeout,
-          callbacks: %{},
-          subscriptions: %{},
-          subscription_id: 0,
-          calling_process: calling_process,
-          send_to_caller: false,
-          receiver: nil,
-          version: Stompex.Validator.normalise_version(headers["accept-version"])
+          timeout: Keyword.get(opts, :timeout, @connection_timeout),
+          calling_process: Keyword.get(opts, :caller),
+          version: Stompex.Validator.normalise_version(headers["accept-version"]),
+          secure: Keyword.get(opts, :secure, false),
+          ssl_opts: Keyword.get(opts, :ssl_opts, [])
         }
 
         { :connect, :init, state }
       end
 
-
       @doc """
       Connects to a remote STOMP server using the application
       configuration.
 
-      ## Configuration
+      This functions requires the configuration to be set in 
+      your own mix configuration files. If you would prefer 
+      to set these in your own code instead, please use
+      `connect/1`.
 
-      In order for this function to work correctly, the
-      application must provide the `:stompex` configuration.
-
-      Below is an example of the most basic configuration
-      block that is required
-
-          config :stompex,
-            host: "host@stompserver.com",
-            login: "login",
-            passcode: "passcode"
-
+      For a detailed list of all available configuration options,
+      please see the `Configuration` section.
       """
       @spec connect() :: GenServer.on_start
       def connect do
-        env       = Application.get_all_env(:stompex)
-        host      = env[:host]
-        port      = env[:port] || @default_stomp_port
-        login     = env[:login] || ""
-        passcode  = env[:passcode] || ""
-        headers   = env[:headers] || %{}
+        connect(Application.get_all_env(:stompex))
+      end
 
-        Stompex.start_link(host, port, login, passcode, headers)
+      @doc """
+      Connects to a remote STOMP server with the provided details.
+      All other `connect` functions will internally invoke this
+      function.
+
+      For a detailed list of all available configuration options,
+      please see the `Configuration` section.
+      """
+      @spec connect(keyword) :: GenServer.on_start
+      def connect(opts) do
+        Stompex.start_link(opts)
       end
 
       @doc """
@@ -74,13 +73,13 @@ defmodule Stompex.Api do
 
       Connections made via this function will default to
       STOMP version 1.2, and not have any heartbeat functionality.
-      If this is required, the `connect/5` function should be
+      If this is required, the `connect/6` function should be
       used instead.
 
       """
-      @spec connect(String.t, integer, String.t, String.t) :: GenServer.on_start
+      @spec connect(String.t, integer, String.t, String.t, keyword()) :: GenServer.on_start
       def connect(host, port, login, passcode) do
-        Stompex.start_link(host, port, login, passcode, %{})
+        connect(host: host, port: port, login: login, passcode: passcode)
       end
 
       @doc """
@@ -98,10 +97,17 @@ defmodule Stompex.Api do
       Please note that if the `accept-version` header is not provided,
       it will be set to `1.2` by default.
 
+      Extra options may be supplied as an optional 6th
+      argument. For a detailed list of all available 
+      configuration options, please see the `Configuration` 
+      section.
+
       """
-      @spec connect(String.t, integer, String.t, String.t, map) :: GenServer.on_start
-      def connect(host, port, login, passcode, headers) do
-        Stompex.start_link(host, port, login, passcode, headers)
+      @spec connect(String.t, integer, String.t, String.t, map, keyword) :: GenServer.on_start
+      def connect(host, port, login, passcode, headers, opts \\ []) do
+        opts
+        |> Keyword.merge([host: host, port: port, login: login, passcode: passcode, headers: headers])
+        |> connect
       end
 
 

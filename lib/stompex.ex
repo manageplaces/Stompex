@@ -1,17 +1,94 @@
 defmodule Stompex do
+  @moduledoc """
+  Stompex is a pure Elixir library for connecting to STOMP
+  servers.
+
+  ## Configuration
+
+  Stompex provides a number of functions for setting up the
+  initial connection. Two of these allow you to provide 
+  a number of options to tailer the connection to your needs.
+  
+  Below is a list of configuration options available.
+
+  
+  - `:host` - The host address of the STOMP server.
+  - `:port` - The port of the STOMP server. Defaults to 61618
+  - `:login` - The username required to connect to the server.
+  - `:passcode` - The password required to connect to the server.
+  - `:headers` - A map of headers to send on connection.
+
+  If the server you're connecting to requires a secure connection,
+  the following options can be used.
+
+  - `:secure` - Whether or not the server requires a secure connection.
+  - `:ssl_opts` - A keyword list of options. The options available here are described in the erlang docs http://erlang.org/doc/man/ssl.html under the `ssl_options()` data type.
+
+  For configuration in your own applications mix config file, 
+  the options should be put under the `:stompex` key. 
+
+  #### Examples
+
+  - A basic configuration
+
+      use Mix.Config
+
+      config :stompex,
+        host: "localhost",
+        port: 61610,
+        login: "username",
+        passcode: "password"
+
+  - A secure connection with default options
+
+      use Mix.Config
+
+      config :stompex,
+        host: "localhost",
+        port: 61610,
+        login: "username",
+        passcode: "password",
+
+        secure: true
+
+  - A secure connection with custom certificates
+
+      use Mix.Config
+
+      config :stompex,
+        host: "localhost",
+        port: 61610,
+        login: "username",
+        passcode: "password",
+
+        secure: true,
+        ssl_opts: [
+          certfile: "/path/to/cert",
+          cacertfile: "/path/to/ca"
+        ]
+
+  """
+
   use Connection
   use Stompex.Api
   require Logger
 
   import Stompex.FrameBuilder
 
+  alias Stompex.Connection, as: Con
+
   @tcp_opts [:binary, active: false]
 
   @doc false
-  def connect(_info, %{ sock: nil, host: host, port: port, timeout: timeout } = state) do
-    case :gen_tcp.connect(to_char_list(host), port, @tcp_opts, timeout) do
-      { :ok, sock } ->
-        stomp_connect(sock, state)
+  def connect(_info, %{ secure: secure, host: host, port: port, timeout: timeout } = state) do
+    conn_opts = case secure do
+      true -> [ state.ssl_opts | @tcp_opts ]
+      false -> @tcp_opts
+    end
+    
+    case Con.start_link(host, port, secure, conn_opts, timeout) do
+      { :ok, pid } ->
+        stomp_connect(%{ state | conn: pid })
 
       { :error, _ } ->
         { :backoff, 1000, state }
@@ -19,7 +96,7 @@ defmodule Stompex do
   end
 
   @doc false
-  def disconnect(info, %{ sock: sock, receiver: receiver } = state) do
+  def disconnect(info, %{ conn: conn, receiver: receiver } = state) do
     frame =
       disconnect_frame()
       |> finish_frame()
@@ -28,32 +105,33 @@ defmodule Stompex do
     Connection.reply(from, :ok)
     GenServer.stop(receiver)
 
-    case :gen_tcp.send(sock, frame) do
+    case Con.send_frame(conn, frame) do
       :ok ->
-        :gen_tcp.close(sock)
-        { :reply, :ok, %{ state | sock: nil, receiver: nil } }
+        Con.close(conn)
+        { :reply, :ok, %{ state | conn: nil, receiver: nil } }
 
       { :error, _ } = error ->
+        GenServer.stop(conn)
         { :stop, error, error }
     end
 
-    { :noconnect, %{ state | sock: nil } }
+    { :noconnect, %{ state | conn: nil } }
   end
 
 
 
-  defp stomp_connect(conn, state) do
+  defp stomp_connect(%{ conn: conn } = state) do
     frame =
       connect_frame(state.version)
-      |> put_header("host", state[:host])
-      |> put_headers(state[:headers])
+      |> put_header("host", state.host)
+      |> put_headers(state.headers)
       |> finish_frame()
 
-    with :ok <- :gen_tcp.send(conn, frame),
+    with :ok <- Con.send_frame(conn, frame),
          { :ok, receiver } <- Stompex.Receiver.start_link(conn),
-          { :ok, frame } <- Stompex.Receiver.receive_frame(receiver)
+         { :ok, frame } <- Stompex.Receiver.receive_frame(receiver)
     do
-      connected_with_frame(frame, %{ state | sock: conn, receiver: receiver})
+      connected_with_frame(frame, %{ state | conn: conn, receiver: receiver })
 
     else
       error ->
@@ -63,6 +141,7 @@ defmodule Stompex do
   end
 
   defp connected_with_frame(%{ cmd: "CONNECTED", headers: headers }, %{ receiver: receiver } = state) do
+    IO.inspect(headers)
     case headers["version"] do
       nil ->
         # No version returned, so we're running on a version 1.0 server
@@ -148,7 +227,7 @@ defmodule Stompex do
   end
 
   @doc false
-  def handle_call({ :send, destination, message }, %{ sock: sock } = state) do
+  def handle_call({ :send, destination, message }, %{ conn: conn } = state) do
     frame =
       send_frame()
       |> put_header("destination", destination)
@@ -156,7 +235,7 @@ defmodule Stompex do
       |> set_body(message)
       |> finish_frame()
 
-    response = :gen_tcp.send(sock, frame)
+    response = Con.send_frame(conn, frame)
     { :reply, response, state }
   end
 
@@ -164,14 +243,14 @@ defmodule Stompex do
 
 
   @doc false
-  def handle_cast({ :acknowledge, frame }, %{ sock: sock } = state) do
+  def handle_cast({ :acknowledge, frame }, %{ conn: conn, version: version } = state) do
     frame =
       ack_frame()
-      |> put_header("message-id", frame.headers["message-id"])
+      |> put_header(Stompex.Validator.ack_header(version), frame.headers["message-id"])
       |> put_header("subscription", frame.headers["subscription"])
       |> finish_frame()
 
-    :gen_tcp.send(sock, frame)
+    Con.send_frame(conn, frame)
 
     { :noreply, state }
   end
@@ -181,14 +260,14 @@ defmodule Stompex do
     { :noreply, state }
   end
   @doc false
-  def handle_cast({ :nack, frame }, %{ sock: sock } = state ) do
+  def handle_cast({ :nack, frame }, %{ conn: conn, version: version } = state ) do
     frame =
       nack_frame()
-      |> put_header("message-id", frame.headers["message-id"])
+      |> put_header(Stompex.Validator.ack_header(version), frame.headers["message-id"])
       |> put_header("subscription", frame.headers["subscription"])
       |> finish_frame()
 
-    :gen_tcp.send(sock, frame)
+    Con.send_frame(conn, frame)
     { :noreply, state }
   end
 
@@ -232,7 +311,7 @@ defmodule Stompex do
 
 
 
-  defp subscribe_to_destination(destination, headers, opts, %{ sock: sock, subscription_id: id, subscriptions: subs } = state) do
+  defp subscribe_to_destination(destination, headers, opts, %{ conn: conn, subscription_id: id, subscriptions: subs } = state) do
     frame =
       subscribe_frame()
       |> put_header("id", headers["id"] || id)
@@ -242,7 +321,7 @@ defmodule Stompex do
 
     state = %{ state | subscription_id: (id + 1) }
 
-    case :gen_tcp.send(sock, finish_frame(frame)) do
+    case Con.send_frame(conn, finish_frame(frame)) do
       :ok ->
         # Great we've subscribed. Now keep track of it
         subscription = %{
@@ -251,8 +330,8 @@ defmodule Stompex do
           compressed: Keyword.get(opts, :compressed, false)
         }
 
-        Stompex.Receiver.next_frame(state[:receiver])
-
+        Stompex.Receiver.next_frame(state.receiver)
+        
         { :reply, :ok, %{ state | subscriptions: Map.merge(subs, %{ destination => subscription })} }
 
       { :error, _ } = error ->
@@ -260,14 +339,14 @@ defmodule Stompex do
     end
   end
 
-  defp unsubscribe_from_destination(destination, %{ sock: sock, subscriptions: subscriptions } = state) do
+  defp unsubscribe_from_destination(destination, %{ conn: conn, subscriptions: subscriptions } = state) do
     subscription = subscriptions[destination]
     frame =
       unsubscribe_frame()
       |> put_header("id", subscription[:id])
       |> finish_frame()
 
-    case :gen_tcp.send(sock, frame) do
+    case Con.send_frame(conn, frame) do
       :ok ->
         { :noreply, %{ state | subscriptions: Map.delete(subscriptions, destination)}}
 
@@ -279,6 +358,7 @@ defmodule Stompex do
 
   defp decompress_frame(frame, dest, %{ subscriptions: subs }) do
     subscription = subs[dest]
+    IO.inspect(frame)
     case subscription.compressed do
       true ->
         frame

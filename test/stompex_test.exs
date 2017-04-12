@@ -1,4 +1,4 @@
-defmodule Stompex2Test do
+defmodule StompexTest do
   use ExUnit.Case
   doctest Stompex
 
