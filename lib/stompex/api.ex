@@ -77,7 +77,7 @@ defmodule Stompex.Api do
       used instead.
 
       """
-      @spec connect(String.t, integer, String.t, String.t, keyword()) :: GenServer.on_start
+      @spec connect(String.t, integer, String.t, String.t) :: GenServer.on_start
       def connect(host, port, login, passcode) do
         connect(host: host, port: port, login: login, passcode: passcode)
       end

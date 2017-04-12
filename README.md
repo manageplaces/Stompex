@@ -105,18 +105,45 @@ Of these options, only the host is required. If this is all you supply, then the
 login and passcode values will be empty strings, and the port will default to
 `61613`.
 
+If your server requires a secure connection, then you can also set the `:secure`
+option to true. In this scenario, you may also provide the `:ssl_opts`  option
+as well. This should be a keyword list, and can contain any option that the
+`:ssl` library provided by erlang supports. For more info on this, please see
+[the erlang documentation](http://erlang.org/doc/man/ssl.html) under the section
+`ssl_options()`.
+
+```elixir
+  config :stompex
+    host: "host@stompserver.com",
+    login: "login",
+    port: 12345,
+    passcode: "passcode",
+    headers: %{},
+
+    secure: true,
+    ssl_opts: [
+      certfile: "/path/to/cert",
+      cacertfile: "/path/to/ca"
+    ]
+```
+
+
 #### `connect/4`
 
 This is the function used in the first example, so there's not much more to explain.
 The four arguments expected are simply the `host`, `port`, `login`, and `passcode`.
 
-#### `connect/5`
+#### `connect/6`
 
 Exactly the same as `connect/4` with the addition of a headers hash. This may or
 may not be required by your server, but anything that your server requires can be
 supplied here. Note that anything you add here, will ONLY be used for the connection,
 and nothing else. If you need headers for other things, then they should be supplied
 later.
+
+The final argument is an optional options hash. Here you can provide any additional
+configuration required by your server. For details on what can be provided here,
+see the description for `connect/0`.
 
 ### subscribe
 
