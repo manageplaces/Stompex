@@ -5,7 +5,7 @@ defmodule Stompex.Receiver do
   import Stompex.FrameBuilder
   alias Stompex.Connection, as: Con
 
-  @header_regex ~r/^([a-zA-Z0-9\-]*):(.*)$/
+  @header_regex ~r/^([a-zA-Z0-9\-_]*):(.*)$/
 
   @doc false
   def handle_cast(:next_frame, %{ conn: conn } = state) do
