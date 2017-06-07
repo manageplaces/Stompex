@@ -35,7 +35,7 @@ defmodule Stompex.Validator do
   `content-length` which is actually an integer.
   """
   @spec format_header(String.t, String.t) :: map
-  def format_header("content-length", value) do
+  def format_header("content-length", value) when is_binary(value) do
     %{ "content-length" => String.to_integer(value) }
   end
   def format_header("version", value) do
