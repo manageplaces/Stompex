@@ -147,6 +147,19 @@ defmodule Stompex do
     { :disconnect, { :close, from }, state }
   end
 
+
+  @doc false
+  def handle_call({ :send, destination, %Stompex.Frame{} = frame }, _, %{ sock: sock } = state) do
+    frame =
+      frame
+      |> put_header("destination", destination)
+      |> put_header("content-length", byte_size(frame.body))
+      |> finish_frame()
+
+    response = :gen_tcp.send(sock, frame)
+    { :reply, response, state }
+  end
+
   @doc false
   def handle_call({ :send, destination, message }, _, %{ sock: sock } = state) do
     frame =
