@@ -148,7 +148,7 @@ defmodule Stompex do
   end
 
   @doc false
-  def handle_call({ :send, destination, message }, %{ sock: sock } = state) do
+  def handle_call({ :send, destination, message }, _, %{ sock: sock } = state) do
     frame =
       send_frame()
       |> put_header("destination", destination)
