@@ -13,7 +13,7 @@ this repo.
 
 ```elixir
 def deps do
-  [{ :stompex, git: "git@github.com:manageplaces/Stompex.git" }]
+  [{:stompex, git: "git@github.com:manageplaces/Stompex.git"}]
 end
 ```
 
@@ -21,7 +21,7 @@ or
 
 ```elixir
 def deps do
-  [{ :stompex, git: "https://github.com/manageplaces/Stomex.git" }]
+  [{`:stompex, git: "https://github.com/manageplaces/Stomex.git"}]
 end
 ```
 
@@ -54,7 +54,7 @@ now, these are the ones you need to get going.
 Lets look at a simple example:
 
 ```elixir
-{ :ok, conn } = Stompex.connect("localhost", 12345, "username", "password")
+{:ok, conn} = Stompex.connect("localhost", 12345, "username", "password")
 
 callback = fn (msg) ->
   IO.puts msg
@@ -144,10 +144,11 @@ valid within the STOMP specification).
 The fourth argument allows you to supply options. The options available
 are:
 
-- `:compressed` - Whether or not the body of the frame is gzip compressed.
-If `false` (which is default), Stompex will simply leave the frames body
-as it is, but if set to `true`, it will automatically decompress the body
-before passing the frame on.
+- `:compressed`
+    Whether or not the body of the frame is gzip compressed.
+    If `false` (which is default), Stompex will simply leave the frames body
+    as it is, but if set to `true`, it will automatically decompress the body
+    before passing the frame on.
 
 ```elixir
 Stompex.subscribe(conn, "/queue/name", %{"header1" => "value 1",
@@ -180,7 +181,7 @@ the server know that you will be acknowledging the messages, but
 supplying a header when you subscribe to a queue or topic
 
 ```elixir
-Stompex.subscribe(conn, "/queue/name", %{ "ack" => "client" })
+Stompex.subscribe(conn, "/queue/name", %{"ack" => "client"})
 ```
 
 Once this has been specified, you are now responsible for
@@ -197,7 +198,6 @@ end
 **Please note:** It is possible for multiple callbacks to be
 registered for a single queue or topic, but only one of these should
 acknowledge the message.
-
 
 It is also possible to `NACK` a message if you're connecting to
 a STOMP server that supports version 1.1 or above of the STOMP
@@ -231,20 +231,20 @@ defmodule StompexTest do
   use GenServer
 
   def start_link() do
-    { :ok, pid } = GenServer.start_link(__MODULE__, %{})
+    {:ok, pid} = GenServer.start_link(__MODULE__, %{})
   end
 
   def init(state) do
-    { :ok, conn } = Stompex.connect()
+    {:ok, conn} = Stompex.connect()
 
     Stompex.send_to_caller(conn, true)
     Stompex.subscribe(conn, "/queue/name")
 
-    { :ok, %{ stompex: conn } }
+    {:ok, %{stompex: conn}}
   end
 
-  def handle_info({ :stompex, "/queue/name", frame }, %{ stompex: conn } = state) do
-    { :noreply, state }
+  def handle_info({:stompex, "/queue/name", frame}, %{stompex: conn} = state) do
+    {:noreply, state}
   end
 
 end
@@ -277,12 +277,12 @@ Stompex.send(conn, "/queue/my-queue", msg)
 Stompex will automatically set the `content-length` header,
 so you are free to add any characters you like to the message.
 
-## That's all folks
+## Conclusion
 
 So that about sums up Stompex. If you run into any problems along the
 way, open an issue. Feel free to open issues to just ask questions.
 
-#### Notes:
+## Notes
 
 Stompex was written initially for an internal application, so it has
 only really been tested at this point for that specific use case. As
@@ -300,19 +300,11 @@ why it's still a 0.x release.
   - Data that has failed
   - Anything else necessary to replicate
 
-#### Todo:
+## Roadmap
 
-There are a number of things missing from Stompex, so here is a brief
-list of things that still need to be added.
+See [FUTURE.md](/FUTURE.md) for future plans.
 
-- Send heartbeats. Stompex is able to receive them, but does not currently send them.
-- Support transactions.
-- Fully support all STOMP versions. We've only really tested on 1.1.
-- Test test test. REALLY need to add some more tests.
-- Anything else remaining in the STOMP spec that a decent STOMP
-  implementation should have.
-
-#### License
+## License
 
 Stompex is released under the MIT license so you're free to use in any
 project you desire. If you feel like attributing us that would be
